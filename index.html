@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="theme-color" content="#1976d2"/>
+  <meta name="description" content="Field Material Management App - Track materials offline"/>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAA2klEQVR4nO2WQQ6DIBRF+7W6dOcJPIEnMJ7AE3gC4wm8gScwnsB4Ag/gCdyZuDQxjYKF0oKJ/2YmhPfnQwghhBBCyP+hBOYA2AFUAB4ArgDOJtcKwBHADsAcQPmtgRrAEcANwAvAE8AdwAnA2uRqAJwB3AA8AdwBHADUvzVQArgAeAN4mVwPABcAC5NrAeAK4A3gYnI9AVwBlN/0fwfgDuBhcj0A3AFsTK4NgIcpcDe5HgDuALZ/bWD7aQN/hSn2B5hiPzDF/gBT7A8wxX4s0z8PyPQLUfRLBCGEEELID+YDYGVamps AAAA0lEQVR4nGNgGAWjYBSMgqEDGBgY/jMwMPxnYGD4TyAeVBoFo2AUjIJRMBgBAwMDQwMAEccC8VIctFAAAAAASUVORK5CYII="/>
+  <title>Field Material App</title>
+  <style>
+    :root{
+      --blue:#1976d2; --green:#2e7d32; --danger:#c62828; --muted:#666;
+      --card:#fff; --bg:#f4f6f8;
+    }
+    body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);margin:12px;padding:0}
+    .wrap{max-width:1024px;margin:12px auto;padding:14px;border-radius:10px;background:linear-gradient(180deg,#ffffff, #fbfdff);box-shadow:0 6px 18px rgba(16,24,40,0.06)}
+    h1{font-size:18px;margin:6px 0 12px;text-align:center}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .full{grid-column:1/-1}
+    label{display:block;font-weight:600;margin-bottom:6px}
+    input[type="text"], input[type="number"], select, textarea{width:100%;padding:8px;border-radius:8px;border:1px solid #d7dfe6;box-sizing:border-box;font-size:14px}
+    select[multiple]{height:110px}
+    .scheme-box{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .scheme-box label{font-weight:400}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    button{padding:9px 12px;border-radius:8px;border:none;cursor:pointer;background:var(--blue);color:#fff;font-weight:600}
+    button.ghost{background:#fff;border:1px solid #dfe7ee;color:#333}
+    button.success{background:var(--green)}
+    button.danger{background:var(--danger)}
+    .materials{margin-top:12px;padding:10px;border-radius:10px;background:#fff;border:1px solid #e6eef7}
+    .hint{font-size:12px;color:var(--muted);margin-top:6px}
+    .formsContainer{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+    .material-form{display:flex;gap:8px;align-items:center;padding:10px;border-radius:8px;border:1px solid #eef3f7;background:#fbfdff;flex-wrap:wrap}
+    .material-form strong{width:100%;font-size:14px}
+    .material-form input[type="number"]{width:110px;padding:6px}
+    .material-form .comment{width:220px}
+    .actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    .output{margin-top:12px;padding:10px;border-radius:8px;background:#fff;border:1px solid #eee;max-height:340px;overflow:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{border:1px solid #eef5f8;padding:6px;text-align:left}
+    .small{font-size:12px;color:var(--muted)}
+    .install-prompt{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1976d2;color:#fff;padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;align-items:center;gap:12px;z-index:1000}
+    .install-prompt button{background:#fff;color:#1976d2;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-weight:600}
+    .install-prompt .close{background:transparent;color:#fff;padding:4px 8px;font-size:20px}
+    @media (max-width:900px){
+      .grid{grid-template-columns:repeat(2,1fr)}
+      .material-form .comment{width:150px}
+    }
+    @media (max-width:600px){
+      .grid{grid-template-columns:1fr}
+      .material-form input[type="number"], .material-form .comment{width:100%}
+      .install-prompt{left:10px;right:10px;transform:none}
+    }
+  </style>
+</head>
+<body>
+  <div id="installPrompt" class="install-prompt">
+    <span>Install this app for offline use</span>
+    <button onclick="installApp()">Install</button>
+    <button class="close" onclick="closeInstallPrompt()">✕</button>
+  </div>
+
+  <div class="wrap">
+    <h1>Field Material Form — Complete (Offline)</h1>
+
+    <div class="grid">
+      <div>
+        <label>Checker (Name)</label>
+        <input id="checker" type="text" placeholder="e.g. Shobi Alam">
+      </div>
+
+      <div>
+        <label>TM (Select)</label>
+        <select id="tm" onchange="autoSelectBlock(); updateBlocks(); saveLast('tm')">
+          <option value="">-- Select TM --</option>
+          <option value="Ayaz">Ayaz</option>
+          <option value="Eliyes">Eliyes</option>
+          <option value="Sona Mia">Sona Mia</option>
+          <option value="Arfat">Arfat</option>
+          <option value="Ayub Khan">Ayub Khan</option>
+          <option value="Omer Farooq">Omer Farooq</option>
+          <option value="Nur Alom">Nur Alom</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Block</label>
+        <select id="block" onchange="updateSubs()"><option value="">-- Select Block --</option></select>
+      </div>
+
+      <div>
+        <label>Sub</label>
+        <select id="sub"><option value="">-- Select Sub --</option></select>
+      </div>
+
+      <div>
+        <label>MRF Number</label>
+        <input id="mrf" type="number" placeholder="MRF number (optional)">
+      </div>
+
+      <div>
+        <label>DRR-CODE</label>
+        <input id="drr" type="text" placeholder="DRR code (optional)">
+      </div>
+
+      <div class="full">
+        <label>Type of Scheme (choose multiple)</label>
+        <div class="scheme-box" id="schemeBox">
+          <label><input type="checkbox" value="Guide wall"> Guide wall</label>
+          <label><input type="checkbox" value="Bamboo crib"> Bamboo crib</label>
+          <label><input type="checkbox" value="Path way"> Path way</label>
+          <label><input type="checkbox" value="Mashonary wall"> Mashonary wall</label>
+          <label><input type="checkbox" value="Drainage"> Drainage</label>
+        </div>
+        <input id="otherScheme" type="text" placeholder="Other scheme (if not listed)" style="margin-top:8px">
+      </div>
+    </div>
+
+    <div class="materials">
+      <label>Materials — select multiple or add custom</label>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <select id="materialsSelect" multiple style="flex:1">
+          <option>Cement</option>
+          <option>Sand</option>
+          <option>Bricks</option>
+          <option>Rope 3mm</option>
+          <option>Rope 6mm</option>
+          <option>Geo Bag</option>
+          <option>Bamboo</option>
+          <option>Rebar 8mm</option>
+          <option>Tarpaulin</option>
+          <option>Borak</option>
+          <option>Plywood</option>
+        </select>
+
+        <div style="min-width:240px">
+          <input id="customMaterial" type="text" placeholder="Custom material name">
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="ghost" onclick="addCustomMaterial()">Add custom</button>
+            <button onclick="generateMaterialForms()" class="success">Generate forms</button>
+          </div>
+          <div class="hint">Tip: Ctrl/Cmd + click to select multiple; mobile: tap multiple items.</div>
+        </div>
+      </div>
+
+      <div id="formsContainer" class="formsContainer"></div>
+    </div>
+
+    <div class="actions">
+      <button onclick="saveEntry()">Save Entry</button>
+      <button onclick="viewSavedEntries()">View Saved Entries</button>
+      <button onclick="exportToExcel()" style="background:var(--green)">Export to Excel</button>
+      <button onclick="deleteAllEntries()" class="danger">Delete All</button>
+      <button onclick="clearForm()" class="ghost">Clear form</button>
+    </div>
+
+    <div id="output" class="output"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>
+    let deferredPrompt;
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('installPrompt').style.display = 'flex';
+    });
+
+    function installApp() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('App installed');
+          }
+          deferredPrompt = null;
+          document.getElementById('installPrompt').style.display = 'none';
+        });
+      }
+    }
+
+    function closeInstallPrompt() {
+      document.getElementById('installPrompt').style.display = 'none';
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+          console.log('Service Worker registered');
+        }).catch(err => {
+          console.log('Service Worker registration failed:', err);
+        });
+      });
+    }
+
+    // All TMs use the same block options (A to G)
+    const allBlocks = ["A","B","C","D","E","F","G"];
+    
+    // TM to Block auto-mapping
+    const tmToBlock = {
+      "Ayaz": "A",
+      "Eliyes": "B",
+      "Sona Mia": "C",
+      "Arfat": "D",
+      "Ayub Khan": "E",
+      "Omer Farooq": "F",
+      "Nur Alom": "G"
+    };
+    
+    // Each block has its own sub options
+    const blockSubs = {
+      "A": ["A1","A2","A3","A4","A5","A6"],
+      "B": ["B1","B2","B3","B4","B5","B6"],
+      "C": ["C1","C2","C3","C4","C5"],
+      "D": ["D1","D2","D3","D4","D5"],
+      "E": ["E1","E2","E3","E4","E5"],
+      "F": ["F1","F2","F3","F4","F5"],
+      "G": ["G1","G2","G3","G4","G5"]
+    };
+
+    (function restoreLast(){
+      const last = JSON.parse(localStorage.getItem('lastForm') || '{}');
+      if (last.checker) document.getElementById('checker').value = last.checker;
+      if (last.tm) {
+        document.getElementById('tm').value = last.tm;
+        autoSelectBlock();
+        updateBlocks();
+      }
+      if (last.block) {
+        document.getElementById('block').value = last.block;
+        updateSubs();
+      }
+    })();
+
+    function autoSelectBlock(){
+      const tm = document.getElementById('tm').value;
+      const blockEl = document.getElementById('block');
+      
+      // Populate blocks first
+      blockEl.innerHTML = '<option value="">-- Select Block --</option>';
+      if (tm){
+        allBlocks.forEach(b=>{
+          const opt = document.createElement('option');
+          opt.value = b; opt.textContent = b;
+          blockEl.appendChild(opt);
+        });
+        
+        // Auto-select the block for this TM
+        if (tmToBlock[tm]){
+          blockEl.value = tmToBlock[tm];
+          updateSubs();
+        }
+      }
+    }
+
+    function updateBlocks(){
+      // This function is now handled by autoSelectBlock
+      // Keeping it for compatibility
+    }
+
+    function updateSubs(){
+      const block = document.getElementById('block').value;
+      const subEl = document.getElementById('sub');
+      subEl.innerHTML = '<option value="">-- Select Sub --</option>';
+      if (block && blockSubs[block]){
+        blockSubs[block].forEach(s=>{
+          const opt = document.createElement('option');
+          opt.value = s; opt.textContent = s;
+          subEl.appendChild(opt);
+        });
+      }
+    }
+
+    function saveLast(key){
+      const lastForm = JSON.parse(localStorage.getItem('lastForm') || '{}');
+      if (key === 'tm') lastForm.tm = document.getElementById('tm').value;
+      const chk = document.getElementById('checker').value.trim();
+      if (chk) lastForm.checker = chk;
+      localStorage.setItem('lastForm', JSON.stringify(lastForm));
+    }
+
+    function addCustomMaterial(){
+      const name = document.getElementById('customMaterial').value.trim();
+      if (!name){ alert('Enter custom material name'); return; }
+      const select = document.getElementById('materialsSelect');
+      const exists = Array.from(select.options).some(o => o.value.toLowerCase() === name.toLowerCase());
+      if (exists){ alert('Material already exists'); document.getElementById('customMaterial').value = ''; return; }
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name + ' (custom)'; opt.selected = true;
+      select.appendChild(opt);
+      document.getElementById('customMaterial').value = '';
+      showMessage('Custom material added: ' + name);
+    }
+
+    function generateMaterialForms(){
+      const select = document.getElementById('materialsSelect');
+      const selected = Array.from(select.selectedOptions).map(o => o.value);
+      const container = document.getElementById('formsContainer');
+      container.innerHTML = '';
+      if (selected.length === 0){ alert('Select at least one material'); return; }
+      selected.forEach(mat => {
+        const div = document.createElement('div');
+        div.className = 'material-form';
+        div.dataset.matName = mat;
+        div.innerHTML = `
+          <strong>${escapeHtml(mat)}</strong>
+          <label class="small">Requested</label><input type="number" step="0.01" min="0" class="requested" placeholder="Requested">
+          <label class="small">Received</label><input type="number" step="0.01" min="0" class="received" placeholder="Received">
+          <label class="small">Used</label><input type="number" step="0.01" min="0" class="used" placeholder="Used">
+          <label class="small">Remaining</label><input type="number" step="0.01" min="0" class="remaining" placeholder="Remaining" readonly>
+          <label class="small">Comment</label><input type="text" class="comment" placeholder="Comment">
+        `;
+        div.querySelectorAll('.received, .used').forEach(i => i.addEventListener('input', ()=>calculateRemaining(div)));
+        container.appendChild(div);
+      });
+      showMessage(selected.length + ' material form(s) generated.');
+    }
+
+    function calculateRemaining(form){
+      const recV = form.querySelector('.received').value.trim();
+      const usedV = form.querySelector('.used').value.trim();
+      const remainingInput = form.querySelector('.remaining');
+      const rec = parseFloat(recV) || 0;
+      const used = parseFloat(usedV) || 0;
+      if (recV === '' && usedV === '') { remainingInput.value = ''; return; }
+      if (used > rec){
+        remainingInput.value = 0;
+        remainingInput.style.border = '1px solid #e53935';
+      } else {
+        remainingInput.style.border = '';
+        const rem = rec - used;
+        remainingInput.value = Number.isInteger(rem) ? rem : rem.toFixed(2);
+      }
+    }
+
+    function escapeHtml(s){
+      return (s||'').toString().replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    }
+
+    function saveEntry(){
+      const checker = document.getElementById('checker').value.trim();
+      const tm = document.getElementById('tm').value;
+      const block = document.getElementById('block').value;
+      const sub = document.getElementById('sub').value;
+      const mrf = document.getElementById('mrf').value.trim();
+      const drr = document.getElementById('drr').value.trim();
+      const otherScheme = document.getElementById('otherScheme').value.trim();
+      const schemes = Array.from(document.querySelectorAll('#schemeBox input[type=checkbox]:checked')).map(i=>i.value);
+      if (otherScheme) schemes.push(otherScheme);
+
+      if (!checker){ alert('Enter Checker name'); return; }
+      if (!tm){ alert('Select TM'); return; }
+      if (!block){ alert('Select Block'); return; }
+      if (!sub){ alert('Select Sub'); return; }
+
+      const forms = Array.from(document.querySelectorAll('.material-form'));
+      const mats = [];
+      for (const f of forms){
+        const name = f.dataset.matName;
+        const received = f.querySelector('.received').value.trim();
+        const used = f.querySelector('.used').value.trim();
+        const remaining = f.querySelector('.remaining').value.trim();
+        const requested = f.querySelector('.requested').value.trim();
+        const comment = f.querySelector('.comment').value.trim();
+
+        if (received !== '' && isNaN(Number(received))){ alert('Received must be a number for ' + name); return; }
+        if (used !== '' && isNaN(Number(used))){ alert('Used must be a number for ' + name); return; }
+        if (remaining !== '' && isNaN(Number(remaining))){ alert('Remaining must be a number for ' + name); return; }
+        if (requested !== '' && isNaN(Number(requested))){ alert('Requested must be a number for ' + name); return; }
+
+        if (received === '' && used === '' && remaining === '' && requested === '') continue;
+
+        if (received !== '' && used !== '' && (parseFloat(used) > parseFloat(received))){
+          if (!confirm(`Used quantity (${used}) for "${name}" is greater than Received (${received}). Continue?`)) return;
+        }
+
+        mats.push({ name, received, used, remaining, requested, comment });
+      }
+
+      if (mats.length === 0){ alert('Enter quantity for at least one material'); return; }
+
+      const entry = {
+        checker, tm, block, sub, mrf, drr, schemes, materials: mats, date: new Date().toLocaleString()
+      };
+
+      const key = 'materialEntries';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      arr.push(entry);
+      localStorage.setItem(key, JSON.stringify(arr));
+
+      localStorage.setItem('lastForm', JSON.stringify({ checker, tm, block }));
+
+      showMessage('Entry saved locally. Total entries: ' + arr.length);
+      clearForm();
+      viewSavedEntries();
+    }
+
+    function viewSavedEntries(){
+      const arr = JSON.parse(localStorage.getItem('materialEntries') || '[]');
+      const out = document.getElementById('output');
+      if (!arr.length){ out.innerHTML = '<div class="small">No saved entries yet.</div>'; return; }
+      let html = `<div class="small">Saved entries: ${arr.length}</div>`;
+      html += '<table><thead><tr><th>Checker</th><th>TM</th><th>Block</th><th>Sub</th><th>MRF</th><th>DRR</th><th>Scheme</th><th>Material</th><th>Requested</th><th>Received</th><th>Used</th><th>Remaining</th><th>Comment</th><th>Date</th></tr></thead><tbody>';
+      arr.forEach(ent=>{
+        ent.materials.forEach(mat=>{
+          html += `<tr>
+            <td>${escapeHtml(ent.checker)}</td>
+            <td>${escapeHtml(ent.tm)}</td>
+            <td>${escapeHtml(ent.block)}</td>
+            <td>${escapeHtml(ent.sub)}</td>
+            <td>${escapeHtml(ent.mrf||'')}</td>
+            <td>${escapeHtml(ent.drr||'')}</td>
+            <td>${escapeHtml((ent.schemes||[]).join(', '))}</td>
+            <td>${escapeHtml(mat.name)}</td>
+            <td>${escapeHtml(mat.requested||'')}</td>
+            <td>${escapeHtml(mat.received||'')}</td>
+            <td>${escapeHtml(mat.used||'')}</td>
+            <td>${escapeHtml(mat.remaining||'')}</td>
+            <td>${escapeHtml(mat.comment||'')}</td>
+            <td>${escapeHtml(ent.date)}</td>
+          </tr>`;
+        });
+      });
+      html += '</tbody></table>';
+      out.innerHTML = html;
+    }
+
+    function exportToExcel(){
+      const arr = JSON.parse(localStorage.getItem('materialEntries') || '[]');
+      if (!arr.length){ alert('No entries to export'); return; }
+      const rows = [];
+      rows.push(["Checker","TM","Block","Sub","MRF","DRR","Scheme","Material","Requested","Received","Used","Remaining","Comment","Date"]);
+      arr.forEach(ent=>{
+        ent.materials.forEach(mat=>{
+          rows.push([ent.checker, ent.tm, ent.block, ent.sub, ent.mrf||'', ent.drr||'', (ent.schemes||[]).join(', '), mat.name, mat.requested||'', mat.received||'', mat.used||'', mat.remaining||'', mat.comment||'', ent.date]);
+        });
+      });
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Entries');
+      XLSX.writeFile(wb, 'Field_Material_Entries.xlsx');
+    }
+
+    function deleteAllEntries(){
+      if (!confirm('Delete ALL saved entries? This cannot be undone.')) return;
+      localStorage.removeItem('materialEntries');
+      showMessage('All entries deleted.');
+      viewSavedEntries();
+    }
+
+    function clearForm(){
+      const last = JSON.parse(localStorage.getItem('lastForm') || '{}');
+      document.getElementById('checker').value = last.checker || '';
+      document.getElementById('tm').value = last.tm || '';
+      updateBlocks();
+      document.getElementById('block').value = last.block || '';
+      updateSubs();
+      document.getElementById('sub').value = '';
+      document.getElementById('mrf').value = '';
+      document.getElementById('drr').value = '';
+      document.getElementById('otherScheme').value = '';
+      document.querySelectorAll('#schemeBox input[type=checkbox]').forEach(c=>c.checked=false);
+      document.getElementById('materialsSelect').selectedIndex = -1;
+      document.getElementById('customMaterial').value = '';
+      document.getElementById('formsContainer').innerHTML = '';
+    }
+
+    function showMessage(msg){
+      const out = document.getElementById('output');
+      out.innerHTML = `<div class="small">${escapeHtml(msg)}</div>`;
+    }
+
+    (function init(){
+      const last = JSON.parse(localStorage.getItem('lastForm') || '{}');
+      if (last.checker) document.getElementById('checker').value = last.checker;
+      if (last.tm) { 
+        document.getElementById('tm').value = last.tm; 
+        updateBlocks(); 
+      }
+      if (last.block) { 
+        document.getElementById('block').value = last.block;
+        updateSubs();
+      }
+      viewSavedEntries();
+      document.getElementById('checker').addEventListener('input', ()=>saveLast('checker'));
+      document.getElementById('tm').addEventListener('change', ()=>saveLast('tm'));
+    })();
+  </script>
+</body>
+</html>
